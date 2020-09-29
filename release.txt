@@ -1,0 +1,8 @@
+APP_DEMO 1.0
+SDK 1.0
+
+1）通用对接DEMO，展示基于 sig mesh vendor 通道透传 dps 数据
+2）支持国家码、GPIO测试从云端拉取、RF测试
+3）支持数据收发、mesh 节点互发数据
+4）支持遥控器功能中的本地控制能力（pub_address 申请）
+

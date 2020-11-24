@@ -25,6 +25,13 @@ void factory_test_enter_cb(void){
     PR_DEBUG("ENTER\n");   
     if_enter_factory_test = 1;
 }
+
+u8 factory_test_rssi_test_start_cb(u8 *para, u8 len){
+    rssi_update_test_name(para, len);
+    app_rssi_init();
+}
+
+
 u8 factory_test_rssi_test_cb(void){
     int rssi = 0;
     ty_rssi_base_test_stop();
@@ -45,6 +52,7 @@ void app_factory_test_init(void){
     ty_uart_cmd_server_for_factory_test.set_enter_callback(&factory_test_enter_cb);
     ty_uart_cmd_server_for_factory_test.set_gpio_test_callback(&ty_gpio_base_test_auto);
     ty_uart_cmd_server_for_factory_test.set_rssi_test_callback(&factory_test_rssi_test_cb);
+    ty_uart_cmd_server_for_factory_test.set_rssi_test_start_callback(&factory_test_rssi_test_start_cb);
     ty_uart_cmd_server_for_factory_test.set_reset_callback(&factory_test_reset_cb);
 }
 

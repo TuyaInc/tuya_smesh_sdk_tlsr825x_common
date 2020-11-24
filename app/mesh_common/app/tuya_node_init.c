@@ -63,12 +63,12 @@ void tuya_uuid_update(void){
     }
     tuya_mesh_uuid_set(node_info.uuid);
 }
-
+//mesh 设备能力值配置
 void tuya_mesh_category_set(uint16_t mesh_category){
     tuya_mesh_category = mesh_category;
     tuya_uuid_update();
 }
-
+//PID 更新接口，不调用则默认用授权的 PID，8字节长度的 PID 字符串
 void tuya_pid_set(uint8_t *pid){
     memcpy(tuya_get_pid(), pid, 8);
     tuya_uuid_update();

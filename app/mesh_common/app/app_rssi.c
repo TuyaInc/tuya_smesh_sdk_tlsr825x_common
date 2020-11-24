@@ -17,6 +17,14 @@
 extern AppVendorS mAppVendor; 
 
 static u8 is_rssi_test = 0;
+static u8 test_name[20] = "ty_prod";
+static u8 test_name_len = 7;
+
+void rssi_update_test_name(u8 *para, u8 len){
+    memset(test_name, 0, sizeof(test_name));
+    memcpy(test_name, para, len);
+    test_name_len = len;
+}
 
 void rssi_test_start_cb(void){
     tuya_ble_hal_gatt_scan(1);
@@ -76,12 +84,16 @@ void app_rssi_run(u8 *adv, u8 adv_len, u8 *mac, int rssi){
         adv_info.data = adv;
 
         if(0 == ty_string_op_adv_report_parse(0x09,&adv_info,&name_info)){
-            if(name_info.len == 7 && memcmp(name_info.data,"ty_prod",7) == 0){
-                if(0 == get_if_uart_init()){
+            if(test_name_len == name_info.len && memcmp(name_info.data,test_name,name_info.len) == 0){
+                static u8 init_flg = 0;
+                if(0 == init_flg){
+                    app_uart_deinit();
                     app_uart_init();
+                    init_flg = 1;
                 }
                 ty_rssi_base_test_update_rssi(rssi);
-            }else if(name_info.len == 7 && memcmp(name_info.data,"ty_mdev",7) == 0){
+            }
+			else if(name_info.len == 7 && memcmp(name_info.data,"ty_mdev",7) == 0){
                 ty_rssi_base_test_update_rssi(rssi);
             }
         }

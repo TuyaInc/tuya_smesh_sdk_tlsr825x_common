@@ -1,7 +1,7 @@
 {
     "name": "tlsr_825x_sig_mesh_common",
     "description": "mesh_base_test",
-    "version": "1.0",
+    "version": "1.1",
     "ic":"tlsr825x",
     "hardware":"TYBT3L",
     "build":{

@@ -1,5 +1,5 @@
 #!/bin/sh
-TELINK_SDK_ROOT=../../../../board/tlsr825x_smesh/sdk/telink_sig_mesh_sdk
+TELINK_SDK_ROOT=../../../board/tlsr825x_smesh/sdk/telink_sig_mesh_sdk
 OPTION=$1
 PARAM1=$2
 APP_DIR=..
@@ -376,5 +376,5 @@ else
     echo "error, try bash run.sh help"
 fi
 
-#git_id: c395eca40d9f775e63baab393d173ec4447d4383
-#date: Mon 28 Sep 17:13:26 CST 2020
+#git_id: 3ba00b0b2f00060ce8d0b687b9efda51e25d83c4
+#date: Tue 24 Nov 21:49:47 CST 2020

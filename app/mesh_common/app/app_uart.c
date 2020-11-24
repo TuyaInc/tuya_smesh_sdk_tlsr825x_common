@@ -10,7 +10,6 @@
 #include "ty_timer_event.h"
 #include "base_oem_config.h"
 #include "hal_uart.h"
-#include "app_storage.h"
 #include "tuya_sigmesh_hal.h"
 
 #define     F_HEAD1                     0x00
@@ -37,22 +36,22 @@ inline static u8 check_sum(u8 *data,u8 len){
 }
 
 
+
 ////////////////////////////////////////////////////////////////////////////////////
 //app_uart正文
 ////////////////////////////////////////////////////////////////////////////////////
-uint8_t get_if_uart_init(void){
-    return uart_init_flg;
-}
+//uint8_t get_if_uart_init(void){
+//    return uart_init_flg;
+//}
 
-void app_uart_init(void){
-#if (TY_BT_MODULE == TYBT8C)
-    if(1 == is_auth_by_tuya()){
-        return;
+void app_uart_reinit(u32 baud){
+    BAUD_TYPE_t _baud;
+    switch(baud){
+        case 115200:_baud = BAUD_RATE_115200;break;
+        case 19200:_baud = BAUD_RATE_19200;break;
+        default:_baud = BAUD_RATE_9600;break;
     }
-#endif
-    uart_init_flg = 1;
 
-    hal_flash_init();
 #if CONFIG_LOG_ON
     #if (TY_BT_MODULE == TYBT8C)
         hal_uart_init(BAUD_RATE_115200, GPIO_UART1_TX, GPIO_UART1_RX);
@@ -61,19 +60,36 @@ void app_uart_init(void){
     #endif
 #else
     #if (TY_BT_MODULE == TYBT8C)
-        hal_uart_init(BAUD_RATE_9600, GPIO_UART1_TX, GPIO_UART1_RX);
+        hal_uart_init(_baud, GPIO_UART1_TX, GPIO_UART1_RX);
     #else
-        hal_uart_init(BAUD_RATE_9600, GPIO_UART0_TX, GPIO_UART0_RX);
+        hal_uart_init(_baud, GPIO_UART0_TX, GPIO_UART0_RX);
     #endif
 #endif
-    ty_fifo_init();
-    app_storage_init();   
+}
 
-    app_unprov_beacon_init();
+void app_uart_deinit(void){
+//    uart_init_flg = 0;
+}
+
+void app_uart_init(void){//除了串口初始化，还有 FIFO 初始化、存储初始化、广播初始化、产测初始化、与mcu通信初始化
+//    uart_init_flg = 1;
+
+    hal_flash_init();//空
+    
+    app_uart_reinit(9600);
+    ty_fifo_init();
+
+    app_unprov_beacon_init();//PID
     app_factory_test_init();
     app_mcu_protocol_init();
 }
-
+/****************************************************
+是一个 loop 函数，不断执行从串口读取数据，放入 fifo 中
+此外还有三个 loop 函数在这个总的 loop 中执行
+app_mcu_protocol_run();
+app_factory_test_run();
+uart_server_run();//解析FIFO中的数据，并调用相应的处理函数
+*********************************************************/
 void app_uart_run(void){
     u8 buf[254];
     int len = hal_uart_read(buf,254);
@@ -93,6 +109,12 @@ void app_uart_run(void){
     uart_server_run();//解析FIFO中的数据，并调用相应的处理函数
 }
 
+/*************************************************************************
+按照串口协议解析 FIFO 中的串口数据，获取有效的数据帧，根据数据帧类别，分别送到：
+
+产测数据处理接口 app_factory_test_cmd(cmd,&buf[F_DATA],len)
+与 MCU 通信的串口对接数据处理接口 app_mcu_protocol_cmd(cmd,&buf[F_DATA],len)
+*****************************************************************************/
 static void uart_server_run(void){
     static u8 is_factory = 1;
     u8 i,num = ty_fifo_get_size();
@@ -130,12 +152,12 @@ static void uart_server_run(void){
         PR_DEBUG_RAW("\n");
 
         ty_fifo_pop(total_len);//correct frame,pop this frame length data
-        if(head == 0x66){
+        if(head == 0x66){//产测
             if(get_if_factory_test_close()){
                 return;
             }
             app_factory_test_cmd(cmd,&buf[F_DATA],len);
-        }else if(head == 0x55){
+        }else if(head == 0x55){//mcu
             app_mcu_protocol_cmd(cmd,&buf[F_DATA],len);       
         }
     }else{//check sum not correct,pop the head length data
@@ -143,3 +165,5 @@ static void uart_server_run(void){
         return;     
     }
 }
+
+

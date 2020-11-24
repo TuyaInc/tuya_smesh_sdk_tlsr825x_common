@@ -43,7 +43,7 @@ typedef struct{
 	u8 bind_kind;
 	u8 mesh_pid[8];
 	u16 dev_ver;
-	u8 extra_info;
+//	u8 extra_info;
 } _PACKED_ fast_prov_mac_st;
 
 typedef struct{

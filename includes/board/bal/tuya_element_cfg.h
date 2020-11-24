@@ -117,3 +117,6 @@
 
 #define MD_ID_ARRAY_SECOND_VD  
 
+//--------
+#define USE_LEVEL   // fix mesh common update  on off model bind bit error
+

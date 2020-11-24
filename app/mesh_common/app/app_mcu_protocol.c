@@ -7,12 +7,13 @@
 #include "ty_uart_cmd_server_for_sig_mesh_uart_common.h"
 #include "tuya_sigmesh_hal.h"
 #include "app_unprov_beacon.h"
-#include "app_storage.h"
 
+
+extern void app_uart_reinit(u32 baud);
 
 int app_mesh_vendor_write(u16 adr_src, u16 adr_dst, u8 *para, u8 len, u8 is_ack);
 int app_mesh_vendor_read(u16 adr_src, u16 adr_dst, u8 *para, u8 len, u8 is_ack);
-void app_mesh_vendor_ad_tx(u16 adr_src, u16 adr_dst, u8 *params, u8 len, u8 is_use_params_adr);
+void app_mesh_vendor_ad_dp_tx(u16 adr_src, u16 adr_dst, u8 *params, u8 len, u8 is_use_params_adr);
 
 ty_uart_cmd_server_for_sig_mesh_uart_common_params_s ty_uart_cmd_server_for_sig_mesh_uart_common_params = {
 };
@@ -38,101 +39,29 @@ u8 mcu_factory_test_rssi_test_cb(u8 is_start_or_stop){//asynchronous
     }
 }
 
+void app_mcu_protocol_reset_cb(void){
+    tuya_mesh_network_reset_with_restore(180);//误重置恢复3min
+}
+
 //---------------------------------------------------------------
-enum {
-    KEY_OFFSET_LOW_POWER_FLAG = 0x00,
-    KEY_OFFSET_MESH_LOCAL_CONTROL_MODE = 0x01,
-    KEY_OFFSET_PUBADDRESS = 0x02,
-};
-
-
 void app_mcu_protocol_init(void){
+    ty_uart_cmd_server_for_sig_mesh_uart_common.set_uart_reinit_callback(&app_uart_reinit);
     ty_uart_cmd_server_for_sig_mesh_uart_common.init(&ty_uart_cmd_server_for_sig_mesh_uart_common_params);
-    ty_uart_cmd_server_for_sig_mesh_uart_common.set_work_state(0);
-    ty_uart_cmd_server_for_sig_mesh_uart_common.set_work_mode(0);
     ty_uart_cmd_server_for_sig_mesh_uart_common.set_query_info_callback(&uart_common_query_info_cb);
-    ty_uart_cmd_server_for_sig_mesh_uart_common.set_reset_callback(&tuya_mesh_network_reset);
+    ty_uart_cmd_server_for_sig_mesh_uart_common.set_reset_callback(&app_mcu_protocol_reset_cb);
     ty_uart_cmd_server_for_sig_mesh_uart_common.set_rssi_test_callback(&mcu_factory_test_rssi_test_cb);
-    ty_uart_cmd_server_for_sig_mesh_uart_common.set_ad_tx_callback(&app_mesh_vendor_ad_tx);
-
-
-    //读取存储在flash中的数据，如果有历史数据，则用历史数据，如果没有则用默认数据
-    u8 kv_data[SAVE_UNIT8_SIZE];
-    u8 kv_no_data = 0;
-    memset(kv_data,0xFF,SAVE_UNIT8_SIZE);
-    if(0 == app_storage_read(0,kv_data,SAVE_VALUE_SIZE)){
-        kv_no_data = 1;
-    }
-    
-    //读取存储在flash中的低功耗模式，如果有历史数据，则用历史数据，如果没有则用默认数据
-    low_power_kind_e low_power_kind;
-    u8 mesh_local_control_mode;
-    u16 pub_address;
-
-    low_power_kind = ty_uart_cmd_server_for_sig_mesh_uart_common.get_low_power_mode();
-    mesh_local_control_mode = ty_uart_cmd_server_for_sig_mesh_uart_common.get_mesh_local_control_mode();
-
-    if(kv_no_data == 1){
-        kv_data[KEY_OFFSET_LOW_POWER_FLAG] = low_power_kind; 
-        kv_data[KEY_OFFSET_MESH_LOCAL_CONTROL_MODE] = mesh_local_control_mode;
-        kv_data[KEY_OFFSET_PUBADDRESS] = 0x00;
-        kv_data[KEY_OFFSET_PUBADDRESS+1] = 0x00;
-    }else{
-        if(kv_data[KEY_OFFSET_LOW_POWER_FLAG] == 0xFF){
-            kv_data[KEY_OFFSET_LOW_POWER_FLAG] = low_power_kind;
-        }
-        if(kv_data[KEY_OFFSET_MESH_LOCAL_CONTROL_MODE] == 0xFF){
-            kv_data[KEY_OFFSET_MESH_LOCAL_CONTROL_MODE] = mesh_local_control_mode;
-        }
-        if(kv_data[KEY_OFFSET_PUBADDRESS] == 0xFF && kv_data[KEY_OFFSET_PUBADDRESS+1] == 0xFF){
-            kv_data[KEY_OFFSET_PUBADDRESS] = 0x00;
-            kv_data[KEY_OFFSET_PUBADDRESS+1] = 0x00;
-        }
-    }
-    low_power_kind = kv_data[KEY_OFFSET_LOW_POWER_FLAG];
-    mesh_local_control_mode = kv_data[KEY_OFFSET_MESH_LOCAL_CONTROL_MODE];
-    pub_address = (kv_data[KEY_OFFSET_PUBADDRESS] << 8) + kv_data[KEY_OFFSET_PUBADDRESS+1];
-
-    ty_uart_cmd_server_for_sig_mesh_uart_common.set_low_power_mode(low_power_kind);
-    ty_uart_cmd_server_for_sig_mesh_uart_common.set_mesh_local_control_mode(mesh_local_control_mode);
-    ty_uart_cmd_server_for_sig_mesh_uart_common.set_mesh_local_control_pub_address(pub_address);
-
-    app_storage_save(0,kv_data,SAVE_VALUE_SIZE);
+    ty_uart_cmd_server_for_sig_mesh_uart_common.set_ad_tx_callback(&app_mesh_vendor_ad_dp_tx);   
 }
 
 int app_mcu_protocol_cmd(u8 cmd, u8 *data, u8 len){
     ty_uart_cmd_server_for_sig_mesh_uart_common.receive_cmd(cmd,data,len);       
 }
 
+void app_mcu_protocol_report_group_address(void){
+    ty_uart_cmd_server_for_sig_mesh_uart_common.receive_cmd(CMD_TY_UART_CMD_SERVER_FOR_SIG_MESH_UART_COMMON_GET_GROUP_ADDRESS,NULL,0);          
+}
+
 int app_mcu_protocol_run(void){
-    static u8 work_state = 0;
-    static low_power_kind_e low_power_kind = LOW_POWER_DISABLE;
-    static u8 mesh_local_control_mode = 0;
-
-    if(work_state != get_if_prov_success()){//mesh状态改变
-        work_state = !work_state;
-        ty_uart_cmd_server_for_sig_mesh_uart_common.set_work_state(work_state == 0?0:2);
-    }
-
-    //low power 状态有变化，则存储
-    if(low_power_kind != ty_uart_cmd_server_for_sig_mesh_uart_common.get_low_power_mode()){
-        u8 kv_data[1];
-        low_power_kind = ty_uart_cmd_server_for_sig_mesh_uart_common.get_low_power_mode();
-        kv_data[0] = low_power_kind; 
-        app_storage_save(KEY_OFFSET_LOW_POWER_FLAG,kv_data,1);
-    }
-
-    //mode local control mode 状态有变化，则存储
-    if(mesh_local_control_mode != ty_uart_cmd_server_for_sig_mesh_uart_common.get_mesh_local_control_mode()){
-        u8 kv_data[1];
-        mesh_local_control_mode = ty_uart_cmd_server_for_sig_mesh_uart_common.get_mesh_local_control_mode();
-        kv_data[0] = mesh_local_control_mode; 
-        app_storage_save(KEY_OFFSET_MESH_LOCAL_CONTROL_MODE,kv_data,1);
-
-        if(mesh_local_control_mode == 1){//具备 pub address 申请的时候关闭快速配网
-            tuya_mesh_fast_prov_en(0);
-        }
-    }
 
     if(!app_factory_test_if_enter())
         ty_uart_cmd_server_for_sig_mesh_uart_common.run();
@@ -322,13 +251,12 @@ int app_mesh_vendor_write(u16 adr_src, u16 adr_dst, u8 *para, u8 len, u8 is_ack)
             break;
         }
         case 0x86:{//配置设备主动pub地址
-            u8 ret =  app_storage_save(KEY_OFFSET_PUBADDRESS,&para[F_MESH_HEAD_LEN+1],2);
+            u16 pub_address = (para[F_MESH_HEAD_LEN+1] << 8) + para[F_MESH_HEAD_LEN+2];
+            u8 ret = ty_uart_cmd_server_for_sig_mesh_uart_common.set_mesh_local_control_pub_address(pub_address);
+
             u8 data[3] = {0x86,0x01,0x00};
             data[2] = (ret == 0?1:0);
-            app_mesh_vendor_ad_tx(adr_dst,adr_src,data,3,0);
-
-            u16 pub_address = (para[F_MESH_HEAD_LEN+1] << 8) + para[F_MESH_HEAD_LEN+2];
-            ty_uart_cmd_server_for_sig_mesh_uart_common.set_mesh_local_control_pub_address(pub_address);
+            app_mesh_vendor_ad_raw_tx(adr_dst,adr_src,data,3,0);
             break;
         }
     }
@@ -360,19 +288,24 @@ int app_mesh_vendor_read(u16 adr_src, u16 adr_dst, u8 *para, u8 len, u8 is_ack){
     return 1;
 }
 
+void app_mesh_vendor_ad_raw_tx(u16 adr_src, u16 adr_dst, u8 *send, u8 send_len, u8 is_use_params_adr){
+    if(is_use_params_adr == 1){
+        tuya_mesh_data_send(0, adr_dst, TUYA_VD_TUYA_WTITE, send, send_len, 0, 0);
+    }else{
+        if(ad_tx_adress != TX_NULL_ADDRESS){
+            tuya_mesh_data_send(0, ad_tx_adress, TUYA_VD_TUYA_DATA, send, send_len, 0, 0);
+        }
+    }
+    ty_timer_event_delete(&wait_get_response_timer_cb);
+    ty_timer_event_add(&wait_get_response_timer_cb,TIMEOUT_GET_RESPONSE_US);
+}
 
-void app_mesh_vendor_ad_tx(u16 adr_src, u16 adr_dst, u8 *params, u8 len, u8 is_use_params_adr){
+void app_mesh_vendor_ad_dp_tx(u16 adr_src, u16 adr_dst, u8 *params, u8 len, u8 is_use_params_adr){
     u8 send[F_MESH_MAX_LEN] = {0x01};
     u8 send_len = 0;
     if(app_mesh_vendor_get_dps(&send[1],F_MESH_MAX_LEN-1,&send_len,params,len,1)){
-        if(is_use_params_adr == 1){
-            tuya_mesh_data_send(0, adr_dst, TUYA_VD_TUYA_WTITE, send, send_len+1, 0, 0);
-        }else{
-            if(ad_tx_adress != TX_NULL_ADDRESS){
-                tuya_mesh_data_send(0, ad_tx_adress, TUYA_VD_TUYA_DATA, send, send_len+1, 0, 0);
-            }
-        }
-        ty_timer_event_delete(&wait_get_response_timer_cb);
-        ty_timer_event_add(&wait_get_response_timer_cb,TIMEOUT_GET_RESPONSE_US);
+        app_mesh_vendor_ad_raw_tx(adr_src, adr_dst, send, send_len+1, is_use_params_adr);
     }
 }
+
+

@@ -36,6 +36,7 @@
 #define     CMD_TY_UART_CMD_SERVER_FOR_SIG_MESH_UART_COMMON_ENABLE_MESH_FUNC        0xB1
 #define     CMD_TY_UART_CMD_SERVER_FOR_SIG_MESH_UART_COMMON_UPLOAD_AD               0xB2
 #define     CMD_TY_UART_CMD_SERVER_FOR_SIG_MESH_UART_COMMON_GET_PUB_ADDRESS         0xB3
+#define     CMD_TY_UART_CMD_SERVER_FOR_SIG_MESH_UART_COMMON_GET_GROUP_ADDRESS       0xB4
 #define     CMD_TY_UART_CMD_SERVER_FOR_SIG_MESH_UART_COMMON_ENABLE_LOW_POWER        0xE5
 
 
@@ -55,18 +56,11 @@ typedef struct{
     void (*receive_cmd)(u8 cmd, u8 *para, u8 len);//接收处理命令
     void (*send_cmd)(u8 cmd, u8 *para, u8 len);//发送命令
     void (*run)(void);//run放在loop中
+    u8 (*get_is_low_power_model)(void);//获取设备是否为低功耗状态
 
-    void (*set_work_state)(u8 state);//当工作状态有变化时调用该函数
-    u8 (*get_work_state)(void);//获取工作状态
-    void (*set_work_mode)(u8 mode);//设置工作模式
-    u8 (*get_work_mode)(void);//获取工作模式
-    void (*set_low_power_mode)(low_power_kind_e mode);//设置低功耗模式
-    u8 (*get_low_power_mode)(void);//获取低功耗模式
-    void (*set_mesh_local_control_mode)(u8 mode);//设置mesh本地控制模式
-    u8 (*get_mesh_local_control_mode)(void);//获取mesh本地控制模式
+    u8 (*set_mesh_local_control_pub_address)(u16 pub_addrss);//设置mesh本地联动的pub_address
 
-    void (*set_mesh_local_control_pub_address)(u16 pub_addrss);//设置mesh本地联动的pub_address
-
+    void (*set_uart_reinit_callback)(void (*cb)(u32 baud));//设置自适应波特率调节回调函数，用来自适应调节波特率，115200/9600...
     void (*set_query_info_callback)(u8 (*cb)(u8 *para, u8 len));//设置请求设备信息的回调函数(当MCU传来设备信息时会调用该回调函数，将参数返回到应用层)
     void (*set_reset_callback)(void (*cb)(void));//设置reset时的回调函数
     void (*set_rssi_test_callback)(u8 (*cb)(u8 is_start_or_stop));//设置RSSI测试的回调函数(cb：参数为1时为启动搜索，为0时为停止搜索，返回搜索结果回复:0-false,> 0 |rssi|)

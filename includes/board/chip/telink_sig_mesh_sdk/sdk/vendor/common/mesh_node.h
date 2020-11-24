@@ -888,6 +888,9 @@ typedef struct{
 #if MD_SERVER_EN
 	model_g_light_s_t onoff_srv[ELE_CNT];			// server
 #endif
+#ifdef USE_LEVEL
+    model_g_light_s_t level_srv[ELE_CNT];  // fix mesh common update  on off model bind bit error
+#endif
 }model_g_onoff_level_t;
 
 typedef struct{
